@@ -85,10 +85,11 @@ See the [window effects](./Window-Effects.md) wiki page.
 
 ### Can I make a window sticky / pinned / always on top / appear on all workspaces?
 
-Not yet, follow/upvote [this issue](https://github.com/niri-wm/niri/issues/932).
+Yes. Use the `toggle-window-pinned` action to keep the focused window visible above workspace windows
+across every workspace on its output. Pinned windows are always floating.
 
-You can emulate this with a script that uses the niri IPC.
-For example, [nirius](https://git.sr.ht/~tsdh/nirius) seems to have this feature (`toggle-follow-mode`).
+To pin matching windows when they open, use the `open-pinned true` window rule. See [window rules]
+(./Configuration:-Window-Rules.md#open-pinned).
 
 ### How do I make the Bitwarden window in Firefox open as floating?
 
