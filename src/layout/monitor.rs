@@ -358,12 +358,15 @@ impl<W: LayoutElement> Monitor<W> {
     }
 
     pub fn into_workspaces(mut self) -> Vec<Workspace<W>> {
-        let pinned_windows = self
-            .pinned
-            .windows()
-            .map(|window| window.id().clone())
-            .collect::<Vec<_>>();
-        for id in pinned_windows {
+        loop {
+            let Some(id) = self
+                .pinned
+                .windows()
+                .next()
+                .map(|window| window.id().clone())
+            else {
+                break;
+            };
             let mut removed = self.pinned.remove_tile(&id, Transaction::new());
             removed.tile.window_mut().set_pinned(false);
             self.workspaces[self.active_workspace_idx].add_tile(
@@ -438,10 +441,7 @@ impl<W: LayoutElement> Monitor<W> {
     }
 
     pub fn windows_mut(&mut self) -> impl Iterator<Item = &mut W> + '_ {
-        self.workspaces
-            .iter_mut()
-            .flat_map(|ws| ws.windows_mut())
-            .chain(self.pinned.windows_mut())
+        self.spaces_mut().flat_map(|ws| ws.windows_mut())
     }
 
     pub fn spaces_mut(&mut self) -> impl Iterator<Item = &mut Workspace<W>> + '_ {
@@ -1140,11 +1140,7 @@ impl<W: LayoutElement> Monitor<W> {
             None => (),
         }
 
-        for ws in self
-            .workspaces
-            .iter_mut()
-            .chain(std::iter::once(&mut self.pinned))
-        {
+        for ws in self.spaces_mut() {
             ws.advance_animations();
         }
     }
@@ -1283,10 +1279,9 @@ impl<W: LayoutElement> Monitor<W> {
             }
         }
 
-        for ws in &mut self.workspaces {
+        for ws in self.spaces_mut() {
             ws.update_config(options.clone());
         }
-        self.pinned.update_config(options.clone());
 
         self.insert_hint_element
             .update_config(options.layout.insert_hint);
@@ -1307,10 +1302,9 @@ impl<W: LayoutElement> Monitor<W> {
     }
 
     pub fn update_shaders(&mut self) {
-        for ws in &mut self.workspaces {
+        for ws in self.spaces_mut() {
             ws.update_shaders();
         }
-        self.pinned.update_shaders();
 
         self.insert_hint_element.update_shaders();
     }
@@ -1320,10 +1314,9 @@ impl<W: LayoutElement> Monitor<W> {
         self.view_size = output_size(&self.output);
         self.working_area = compute_working_area(&self.output);
 
-        for ws in &mut self.workspaces {
+        for ws in self.spaces_mut() {
             ws.update_output_size();
         }
-        self.pinned.update_output_size();
     }
 
     pub fn move_workspace_down(&mut self) {

@@ -3303,9 +3303,6 @@ impl<W: LayoutElement> Layout<W> {
                     true,
                     None,
                 );
-                if activate {
-                    *active_monitor_idx = monitor_idx;
-                }
                 return;
             }
 
@@ -3346,7 +3343,6 @@ impl<W: LayoutElement> Layout<W> {
             );
             if activate {
                 mon.pinned_focused = true;
-                *active_monitor_idx = monitor_idx;
             }
             if mon.workspace_switch.is_none() {
                 mon.clean_up_workspaces();
@@ -3407,7 +3403,6 @@ impl<W: LayoutElement> Layout<W> {
         if let Some(id) =
             pinned_window.filter(|id| self.monitors().any(|mon| mon.pinned.has_window(id)))
         {
-            self.toggle_window_pinned(Some(&id));
             self.set_window_floating(Some(&id), false);
             return;
         }
@@ -4520,7 +4515,6 @@ impl<W: LayoutElement> Layout<W> {
             }
 
             move_.tile.window_mut().set_pinned(false);
-            move_.is_pinned = false;
         }
 
         match &mut self.monitor_set {
