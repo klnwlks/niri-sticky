@@ -40,6 +40,7 @@ struct TestWindowInner {
     is_pending_windowed_fullscreen: Cell<bool>,
     animate_next_configure: Cell<bool>,
     animation_snapshot: RefCell<Option<LayoutElementRenderSnapshot>>,
+    is_pinned: Cell<bool>,
     rules: ResolvedWindowRules,
 }
 
@@ -76,6 +77,10 @@ impl TestWindowParams {
 
 impl TestWindow {
     fn new(params: TestWindowParams) -> Self {
+        let is_pinned = params
+            .rules
+            .as_ref()
+            .is_some_and(|rules| rules.open_pinned == Some(true));
         Self(Rc::new(TestWindowInner {
             id: params.id,
             parent_id: Cell::new(params.parent_id),
@@ -92,6 +97,7 @@ impl TestWindow {
             is_pending_windowed_fullscreen: Cell::new(false),
             animate_next_configure: Cell::new(false),
             animation_snapshot: RefCell::new(None),
+            is_pinned: Cell::new(is_pinned),
             rules: params.rules.unwrap_or_default(),
         }))
     }
@@ -154,6 +160,13 @@ impl LayoutElement for TestWindow {
 
     fn id(&self) -> &Self::Id {
         &self.0.id
+    }
+    fn is_pinned(&self) -> bool {
+        self.0.is_pinned.get()
+    }
+
+    fn set_pinned(&mut self, pinned: bool) {
+        self.0.is_pinned.set(pinned);
     }
 
     fn size(&self) -> Size<i32, Logical> {

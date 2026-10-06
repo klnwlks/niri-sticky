@@ -27,6 +27,7 @@ struct TestWindowInner {
     pending_sizing_mode: SizingMode,
     csd_shadow_width: i32,
     csd_shadow_buffer: SolidColorBuffer,
+    is_pinned: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -54,6 +55,7 @@ impl TestWindow {
                 pending_sizing_mode: SizingMode::Normal,
                 csd_shadow_width: 0,
                 csd_shadow_buffer: SolidColorBuffer::new((0., 0.), [0., 0., 0., 0.3]),
+                is_pinned: false,
             })),
             rules: ResolvedWindowRules::default(),
         }
@@ -135,6 +137,13 @@ impl LayoutElement for TestWindow {
 
     fn id(&self) -> &Self::Id {
         &self.id
+    }
+    fn is_pinned(&self) -> bool {
+        self.inner.borrow().is_pinned
+    }
+
+    fn set_pinned(&mut self, pinned: bool) {
+        self.inner.borrow_mut().is_pinned = pinned;
     }
 
     fn size(&self) -> Size<i32, Logical> {

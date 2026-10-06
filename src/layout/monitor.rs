@@ -65,6 +65,10 @@ pub struct Monitor<W: LayoutElement> {
     working_area: Rectangle<f64, Logical>,
     // Must always contain at least one.
     pub(super) workspaces: Vec<Workspace<W>>,
+    /// Floating windows pinned to this output, shown above every workspace.
+    pub(super) pinned: Workspace<W>,
+    /// Whether keyboard focus is currently in the pinned floating space.
+    pub(super) pinned_focused: bool,
     /// Index of the currently active workspace.
     pub(super) active_workspace_idx: usize,
     /// ID of the previously active workspace.
@@ -326,6 +330,7 @@ impl<W: LayoutElement> Monitor<W> {
         }
 
         let ws = Workspace::new(output.clone(), clock.clone(), options.clone());
+        let pinned = Workspace::new(output.clone(), clock.clone(), options.clone());
         workspaces.push(ws);
 
         Self {
@@ -335,6 +340,8 @@ impl<W: LayoutElement> Monitor<W> {
             view_size,
             working_area,
             workspaces,
+            pinned,
+            pinned_focused: false,
             active_workspace_idx,
             previous_workspace_id: None,
             insert_hint: None,
@@ -351,6 +358,25 @@ impl<W: LayoutElement> Monitor<W> {
     }
 
     pub fn into_workspaces(mut self) -> Vec<Workspace<W>> {
+        let pinned_windows = self
+            .pinned
+            .windows()
+            .map(|window| window.id().clone())
+            .collect::<Vec<_>>();
+        for id in pinned_windows {
+            let mut removed = self.pinned.remove_tile(&id, Transaction::new());
+            removed.tile.window_mut().set_pinned(false);
+            self.workspaces[self.active_workspace_idx].add_tile(
+                removed.tile,
+                WorkspaceAddWindowTarget::Auto,
+                ActivateWindow::No,
+                removed.width,
+                removed.is_full_width,
+                true,
+                None,
+            );
+        }
+
         self.workspaces.retain(|ws| ws.has_windows_or_name());
 
         for ws in &mut self.workspaces {
@@ -404,8 +430,24 @@ impl<W: LayoutElement> Monitor<W> {
         self.idx_of_ws(id).is_some()
     }
 
-    pub fn windows(&self) -> impl Iterator<Item = &W> {
-        self.workspaces.iter().flat_map(|ws| ws.windows())
+    pub fn windows(&self) -> impl Iterator<Item = &W> + '_ {
+        self.workspaces
+            .iter()
+            .flat_map(|ws| ws.windows())
+            .chain(self.pinned.windows())
+    }
+
+    pub fn windows_mut(&mut self) -> impl Iterator<Item = &mut W> + '_ {
+        self.workspaces
+            .iter_mut()
+            .flat_map(|ws| ws.windows_mut())
+            .chain(self.pinned.windows_mut())
+    }
+
+    pub fn spaces_mut(&mut self) -> impl Iterator<Item = &mut Workspace<W>> + '_ {
+        self.workspaces
+            .iter_mut()
+            .chain(std::iter::once(&mut self.pinned))
     }
 
     pub fn has_window(&self, window: &W::Id) -> bool {
@@ -542,6 +584,23 @@ impl<W: LayoutElement> Monitor<W> {
             is_floating,
             None,
         );
+    }
+    pub fn add_pinned_window(&mut self, window: W, activate: ActivateWindow) {
+        let tile = self.pinned.make_tile(window);
+        let width = ColumnWidth::Fixed(tile.tile_size().w);
+        self.pinned.add_tile(
+            tile,
+            WorkspaceAddWindowTarget::Auto,
+            activate,
+            width,
+            false,
+            true,
+            None,
+        );
+
+        if activate.map_smart(|| true) {
+            self.pinned_focused = true;
+        }
     }
 
     pub fn add_column(
@@ -797,13 +856,17 @@ impl<W: LayoutElement> Monitor<W> {
     }
 
     pub fn focus_window_or_workspace_down(&mut self) {
-        if !self.active_workspace().focus_down() {
+        if self.pinned_focused {
+            self.pinned.focus_down();
+        } else if !self.active_workspace().focus_down() {
             self.switch_workspace_down();
         }
     }
 
     pub fn focus_window_or_workspace_up(&mut self) {
-        if !self.active_workspace().focus_up() {
+        if self.pinned_focused {
+            self.pinned.focus_up();
+        } else if !self.active_workspace().focus_up() {
             self.switch_workspace_up();
         }
     }
@@ -1027,7 +1090,19 @@ impl<W: LayoutElement> Monitor<W> {
     }
 
     pub fn active_window(&self) -> Option<&W> {
-        self.active_workspace_ref().active_window()
+        if self.pinned_focused {
+            self.pinned.active_window()
+        } else {
+            self.active_workspace_ref().active_window()
+        }
+    }
+
+    pub fn active_window_mut(&mut self) -> Option<&mut W> {
+        if self.pinned_focused {
+            self.pinned.active_window_mut()
+        } else {
+            self.active_workspace().active_window_mut()
+        }
     }
 
     pub fn advance_animations(&mut self) {
@@ -1065,7 +1140,11 @@ impl<W: LayoutElement> Monitor<W> {
             None => (),
         }
 
-        for ws in &mut self.workspaces {
+        for ws in self
+            .workspaces
+            .iter_mut()
+            .chain(std::iter::once(&mut self.pinned))
+        {
             ws.advance_animations();
         }
     }
@@ -1075,6 +1154,7 @@ impl<W: LayoutElement> Monitor<W> {
             .as_ref()
             .is_some_and(|s| s.is_animation_ongoing())
             || self.workspaces.iter().any(|ws| ws.are_animations_ongoing())
+            || self.pinned.are_animations_ongoing()
     }
 
     pub fn are_transitions_ongoing(&self) -> bool {
@@ -1083,6 +1163,7 @@ impl<W: LayoutElement> Monitor<W> {
                 .workspaces
                 .iter()
                 .any(|ws| ws.are_transitions_ongoing())
+            || self.pinned.are_transitions_ongoing()
     }
 
     pub fn update_render_elements(&mut self, is_active: bool) {
@@ -1103,6 +1184,8 @@ impl<W: LayoutElement> Monitor<W> {
                 insert_hint_ws_geo = Some(geo);
             }
         }
+        self.pinned
+            .update_render_elements(is_active, RenderLayer::Normal);
 
         self.insert_hint_render_loc = None;
         if let Some(hint) = &self.insert_hint {
@@ -1203,6 +1286,7 @@ impl<W: LayoutElement> Monitor<W> {
         for ws in &mut self.workspaces {
             ws.update_config(options.clone());
         }
+        self.pinned.update_config(options.clone());
 
         self.insert_hint_element
             .update_config(options.layout.insert_hint);
@@ -1226,6 +1310,7 @@ impl<W: LayoutElement> Monitor<W> {
         for ws in &mut self.workspaces {
             ws.update_shaders();
         }
+        self.pinned.update_shaders();
 
         self.insert_hint_element.update_shaders();
     }
@@ -1238,6 +1323,7 @@ impl<W: LayoutElement> Monitor<W> {
         for ws in &mut self.workspaces {
             ws.update_output_size();
         }
+        self.pinned.update_output_size();
     }
 
     pub fn move_workspace_down(&mut self) {
@@ -1351,7 +1437,11 @@ impl<W: LayoutElement> Monitor<W> {
             return None;
         }
 
-        self.active_workspace_ref().active_window_visual_rectangle()
+        if self.pinned_focused {
+            self.pinned.active_window_visual_rectangle()
+        } else {
+            self.active_workspace_ref().active_window_visual_rectangle()
+        }
     }
 
     fn workspace_size(&self, zoom: f64) -> Size<f64, Logical> {
@@ -1568,6 +1658,10 @@ impl<W: LayoutElement> Monitor<W> {
     }
 
     pub fn window_under(&self, pos_within_output: Point<f64, Logical>) -> Option<(&W, HitType)> {
+        if let Some(hit) = self.pinned.window_under(pos_within_output) {
+            return Some(hit);
+        }
+
         let (ws, geo) = self.workspace_under(pos_within_output)?;
 
         if self.overview_progress.is_some() {
@@ -1588,8 +1682,12 @@ impl<W: LayoutElement> Monitor<W> {
             return None;
         }
 
-        let (ws, geo) = self.workspace_under(pos_within_output)?;
-        ws.resize_edges_under(pos_within_output - geo.loc)
+        self.pinned
+            .resize_edges_under(pos_within_output)
+            .or_else(|| {
+                let (ws, geo) = self.workspace_under(pos_within_output)?;
+                ws.resize_edges_under(pos_within_output - geo.loc)
+            })
     }
 
     pub(super) fn insert_position(
@@ -1811,6 +1909,31 @@ impl<W: LayoutElement> Monitor<W> {
                 }
             }
         }
+        // Pinned windows use output coordinates and stay at full size during workspace switches
+        // and in the overview. Draw them last so they remain above every workspace.
+        let crop_bounds = Rectangle::new(
+            Point::from((-i32::MAX / 2, -i32::MAX / 2)),
+            Size::from((i32::MAX, i32::MAX)),
+        );
+        self.pinned.render_floating(
+            ctx.r(),
+            XrayPos::new(Point::default(), 1.),
+            focus_ring,
+            RenderLayer::Normal,
+            &mut |elem| {
+                let elem = CropRenderElement::from_element(elem, scale, crop_bounds);
+                if let Some(elem) = elem {
+                    let elem = MonitorInnerRenderElement::Workspace(elem);
+                    let elem = RescaleRenderElement::from_element(elem, Point::default(), 1.);
+                    let elem = RelocateRenderElement::from_element(
+                        elem,
+                        Point::default(),
+                        Relocate::Relative,
+                    );
+                    push(elem);
+                }
+            },
+        );
     }
 
     pub fn render_workspace_shadows<R: NiriRenderer>(
@@ -2119,7 +2242,7 @@ impl<W: LayoutElement> Monitor<W> {
     }
 
     #[cfg(test)]
-    pub(super) fn verify_invariants(&self) {
+    pub(super) fn verify_invariants(&self, move_win_id: Option<&W::Id>) {
         use approx::assert_abs_diff_eq;
 
         let options =
@@ -2196,7 +2319,7 @@ impl<W: LayoutElement> Monitor<W> {
             }
         }
 
-        for workspace in &self.workspaces {
+        for workspace in self.workspaces.iter().chain(std::iter::once(&self.pinned)) {
             assert_eq!(self.clock, workspace.clock);
 
             assert_eq!(
@@ -2215,6 +2338,18 @@ impl<W: LayoutElement> Monitor<W> {
                 "workspace options must be synchronized with monitor"
             );
         }
+
+        for window in self.pinned.windows() {
+            assert!(
+                window.is_pinned(),
+                "pinned workspace must contain pinned windows"
+            );
+            assert!(
+                self.pinned.is_floating(window.id()),
+                "pinned windows must be floating"
+            );
+        }
+        self.pinned.verify_invariants(move_win_id);
 
         let scale = self.scale().fractional_scale();
         let iter = self.workspaces_with_render_geo();

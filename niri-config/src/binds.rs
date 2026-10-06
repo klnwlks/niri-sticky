@@ -335,6 +335,9 @@ pub enum Action {
     MoveWorkspaceToMonitorPrevious,
     MoveWorkspaceToMonitorNext,
     ToggleWindowFloating,
+    ToggleWindowPinned,
+    #[knuffel(skip)]
+    ToggleWindowPinnedById(u64),
     #[knuffel(skip)]
     ToggleWindowFloatingById(u64),
     MoveWindowToFloating,
@@ -671,6 +674,10 @@ impl From<niri_ipc::Action> for Action {
             niri_ipc::Action::ToggleWindowFloating { id: None } => Self::ToggleWindowFloating,
             niri_ipc::Action::ToggleWindowFloating { id: Some(id) } => {
                 Self::ToggleWindowFloatingById(id)
+            }
+            niri_ipc::Action::ToggleWindowPinned { id: None } => Self::ToggleWindowPinned,
+            niri_ipc::Action::ToggleWindowPinned { id: Some(id) } => {
+                Self::ToggleWindowPinnedById(id)
             }
             niri_ipc::Action::MoveWindowToFloating { id: None } => Self::MoveWindowToFloating,
             niri_ipc::Action::MoveWindowToFloating { id: Some(id) } => {

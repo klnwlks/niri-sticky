@@ -1162,6 +1162,7 @@ impl State {
         let mut floating_height = None;
         let is_full_width = rules.open_maximized.unwrap_or(false);
         let is_floating = rules.compute_open_floating(toplevel);
+        let is_pinned = rules.open_pinned == Some(true);
 
         // Tell the surface the preferred size and bounds for its likely output.
         let ws = rules
@@ -1176,11 +1177,13 @@ impl State {
         let mut is_pending_maximized = false;
         if let Some(ws) = ws {
             // Set a fullscreen and maximized state based on window request and window rule.
-            is_pending_maximized = (*wants_maximized && rules.open_maximized_to_edges.is_none())
-                || rules.open_maximized_to_edges == Some(true);
+            is_pending_maximized = !is_pinned
+                && ((*wants_maximized && rules.open_maximized_to_edges.is_none())
+                    || rules.open_maximized_to_edges == Some(true));
 
-            if (wants_fullscreen.is_some() && rules.open_fullscreen.is_none())
-                || rules.open_fullscreen == Some(true)
+            if !is_pinned
+                && ((wants_fullscreen.is_some() && rules.open_fullscreen.is_none())
+                    || rules.open_fullscreen == Some(true))
             {
                 toplevel.with_pending_state(|state| {
                     state.states.set(xdg_toplevel::State::Fullscreen);
