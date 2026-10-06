@@ -67,6 +67,9 @@ pub struct ResolvedWindowRules {
     /// Whether the window should open fullscreen.
     pub open_fullscreen: Option<bool>,
 
+    /// Whether the window should open pinned to the monitor.
+    pub open_pinned: Option<bool>,
+
     /// Whether the window should open floating.
     pub open_floating: Option<bool>,
 
@@ -176,6 +179,12 @@ impl<'a> WindowRef<'a> {
             WindowRef::Mapped(mapped) => mapped.is_floating(),
         }
     }
+    pub fn is_pinned(self) -> bool {
+        match self {
+            WindowRef::Mapped(mapped) => mapped.is_pinned(),
+            WindowRef::Unmapped(_) => false,
+        }
+    }
 
     pub fn is_window_cast_target(self) -> bool {
         match self {
@@ -253,6 +262,10 @@ impl ResolvedWindowRules {
 
                 if let Some(x) = rule.open_fullscreen {
                     resolved.open_fullscreen = Some(x);
+                }
+
+                if let Some(x) = rule.open_pinned {
+                    resolved.open_pinned = Some(x);
                 }
 
                 if let Some(x) = rule.open_floating {
@@ -375,6 +388,10 @@ impl ResolvedWindowRules {
     }
 
     pub fn compute_open_floating(&self, toplevel: &ToplevelSurface) -> bool {
+        if self.open_pinned == Some(true) {
+            return true;
+        }
+
         if let Some(res) = self.open_floating {
             return res;
         }
@@ -448,6 +465,11 @@ fn window_matches(window: WindowRef, role: &XdgToplevelSurfaceRoleAttributes, m:
 
     if let Some(is_floating) = m.is_floating {
         if window.is_floating() != is_floating {
+            return false;
+        }
+    }
+    if let Some(is_pinned) = m.is_pinned {
+        if window.is_pinned() != is_pinned {
             return false;
         }
     }

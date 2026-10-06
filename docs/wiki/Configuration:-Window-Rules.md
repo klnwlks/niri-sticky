@@ -34,6 +34,7 @@ window-rule {
     match is-focused=false
     match is-active-in-column=true
     match is-floating=true
+    match is-pinned=true
     match is-window-cast-target=true
     match is-urgent=true
     match at-startup=true
@@ -47,6 +48,7 @@ window-rule {
     open-maximized-to-edges true
     open-fullscreen true
     open-floating true
+    open-pinned true
     open-focused false
 
     // Properties that apply continuously.
@@ -266,6 +268,20 @@ Matches floating windows.
 ```kdl
 window-rule {
     match is-floating=true
+}
+```
+
+#### `is-pinned`
+
+Can be `true` or `false`.
+Matches windows pinned to their output and shown on every workspace on that output.
+
+> [!NOTE]
+> This matcher applies after the window is opened or pinned.
+
+```kdl
+window-rule {
+    match is-pinned=true
 }
 ```
 
@@ -500,6 +516,18 @@ You can also set this to `false` to *prevent* a window from opening in the float
 // Open all windows in the tiling layout, overriding any auto-floating logic.
 window-rule {
     open-floating false
+}
+```
+
+#### `open-pinned`
+
+Open the window as a floating window pinned to its output. It remains visible above workspace windows
+on every workspace of that output.
+
+```kdl
+window-rule {
+    match app-id="^org.example.AlwaysVisible$"
+    open-pinned true
 }
 ```
 

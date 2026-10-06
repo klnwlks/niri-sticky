@@ -66,6 +66,61 @@ fn simple() {
 }
 
 #[test]
+fn open_pinned_window_stays_visible_after_workspace_switch() {
+    let config = Config::parse_mem(
+        "workspace \"first\"\nworkspace \"second\"\nwindow-rule { open-pinned true; open-fullscreen true; }",
+    )
+    .unwrap();
+    let mut f = Fixture::with_config(config);
+    f.add_output(1, (1920, 1080));
+
+    let id = f.add_client();
+    let window = f.client(id).create_window();
+    let surface = window.surface.clone();
+    window.commit();
+    f.roundtrip(id);
+
+    let window = f.client(id).window(&surface);
+    window.attach_new_buffer();
+    window.ack_last_and_commit();
+    f.double_roundtrip(id);
+
+    let (target_window, initial_workspace_id) = {
+        let layout = &f.niri().layout;
+        let mapped = layout.windows().next().unwrap().1;
+        assert!(mapped.is_pinned());
+        assert!(mapped.is_floating());
+        assert!(mapped.sizing_mode().is_normal());
+        assert!(layout
+            .active_workspace()
+            .unwrap()
+            .windows()
+            .next()
+            .is_none());
+
+        (
+            mapped.window.clone(),
+            layout.active_workspace().unwrap().id(),
+        )
+    };
+
+    f.niri().layout.switch_workspace_down();
+    f.niri_complete_animations();
+
+    let layout = &f.niri().layout;
+    assert_ne!(
+        layout.active_workspace().unwrap().id(),
+        initial_workspace_id
+    );
+    assert!(layout
+        .windows()
+        .any(|(_, mapped)| mapped.window == target_window && mapped.is_pinned()));
+    assert!(layout
+        .focus()
+        .is_some_and(|mapped| mapped.window == target_window));
+}
+
+#[test]
 #[should_panic(expected = "Protocol error 3 on object xdg_surface")]
 fn dont_ack_initial_configure() {
     let mut f = Fixture::new();

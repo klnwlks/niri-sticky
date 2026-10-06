@@ -5,6 +5,9 @@
 Floating windows in niri always show on top of the tiled windows.
 The floating layout does not scroll.
 Each workspace/monitor has its own floating layout, just like each workspace/monitor has its own tiling layout.
+You can pin a window to its output with the `toggle-window-pinned` bind. Pinned windows remain visible
+above the workspace windows on every workspace of that output and are always floating. Use the
+`open-pinned true` window rule to pin matching windows when they open.
 
 New windows will automatically float if they have a parent (e.g. dialogs) or if they are fixed size (e.g. splash screens).
 To change a window between floating and tiling, you can use the `toggle-window-floating` bind or right click while dragging/moving the window.

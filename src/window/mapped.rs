@@ -96,6 +96,8 @@ pub struct Mapped {
 
     /// Whether this window is floating.
     is_floating: bool,
+    /// Whether this window appears on every workspace of its output.
+    is_pinned: bool,
 
     /// Whether this window is a target of a window cast.
     is_window_cast_target: bool,
@@ -275,6 +277,8 @@ impl Mapped {
     pub fn new(window: Window, rules: ResolvedWindowRules, hook: HookId, config: &Config) -> Self {
         let surface = window.wl_surface().expect("no X11 support");
         let credentials = get_credentials_for_surface(&surface);
+        let is_pinned = rules.open_pinned == Some(true);
+
         let mut rv = Self {
             window,
             id: MappedId::next(),
@@ -289,6 +293,7 @@ impl Mapped {
             is_focused: false,
             is_active_in_column: true,
             is_floating: false,
+            is_pinned,
             is_window_cast_target: false,
             ignore_opacity_window_rule: false,
             block_out_buffer: RefCell::new(SolidColorBuffer::new((0., 0.), [0., 0., 0., 1.])),
@@ -382,6 +387,9 @@ impl Mapped {
     pub fn is_window_cast_target(&self) -> bool {
         self.is_window_cast_target
     }
+    pub fn is_pinned(&self) -> bool {
+        self.is_pinned
+    }
 
     pub fn toggle_ignore_opacity_window_rule(&mut self) {
         self.ignore_opacity_window_rule = !self.ignore_opacity_window_rule;
@@ -403,6 +411,14 @@ impl Mapped {
         }
 
         self.is_window_cast_target = value;
+        self.need_to_recompute_rules = true;
+    }
+    pub fn set_is_pinned(&mut self, pinned: bool) {
+        if self.is_pinned == pinned {
+            return;
+        }
+
+        self.is_pinned = pinned;
         self.need_to_recompute_rules = true;
     }
 
@@ -624,6 +640,13 @@ impl LayoutElement for Mapped {
 
     fn id(&self) -> &Self::Id {
         &self.window
+    }
+    fn is_pinned(&self) -> bool {
+        self.is_pinned
+    }
+
+    fn set_pinned(&mut self, pinned: bool) {
+        self.set_is_pinned(pinned);
     }
 
     fn update_config(&mut self, blur_config: niri_config::Blur) {

@@ -594,6 +594,16 @@ impl WindowMru {
             }
         }
 
+        for mon in niri.layout.monitors() {
+            let on_current_output = mon.output() == output;
+            for mapped in mon.windows().filter(|mapped| mapped.is_pinned()) {
+                let mut thumbnail = Thumbnail::from_mapped(mapped, niri.clock.clone(), config);
+                thumbnail.on_current_output = on_current_output;
+                thumbnail.on_current_workspace = on_current_output;
+                thumbnails.push(thumbnail);
+            }
+        }
+
         thumbnails
             .sort_by(|Thumbnail { timestamp: t1, .. }, Thumbnail { timestamp: t2, .. }| t2.cmp(t1));
 
