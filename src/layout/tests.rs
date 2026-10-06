@@ -2120,6 +2120,135 @@ fn window_closed_on_previous_workspace() {
 }
 
 #[test]
+fn pinned_windows_remain_above_every_workspace_on_their_output() {
+    let mut layout = Layout::default();
+    Op::AddOutput(1).apply(&mut layout);
+    let output = layout.outputs().next().unwrap().clone();
+
+    layout.add_window(
+        TestWindow::new(TestWindowParams::new(1)),
+        AddWindowTarget::Auto,
+        None,
+        None,
+        false,
+        false,
+        ActivateWindow::Yes,
+    );
+
+    let pinned_rules = ResolvedWindowRules {
+        open_pinned: Some(true),
+        ..Default::default()
+    };
+    layout.add_window(
+        TestWindow::new(TestWindowParams {
+            rules: Some(pinned_rules),
+            ..TestWindowParams::new(2)
+        }),
+        AddWindowTarget::Auto,
+        None,
+        None,
+        false,
+        false,
+        ActivateWindow::Yes,
+    );
+
+    let pinned_pos = {
+        let monitor = layout.monitor_for_output(&output).unwrap();
+        let (tile, tile_pos, _) = monitor
+            .pinned
+            .tiles_with_render_positions()
+            .find(|(tile, _, _)| tile.window().id() == &2)
+            .unwrap();
+        tile_pos
+            + tile.window_loc()
+            + Point::from((tile.window_size().w / 2., tile.window_size().h / 2.))
+    };
+    assert_eq!(
+        layout
+            .window_under(&output, pinned_pos)
+            .map(|(window, _)| *window.id()),
+        Some(2)
+    );
+
+    layout.switch_workspace_down();
+    layout.add_window(
+        TestWindow::new(TestWindowParams::new(3)),
+        AddWindowTarget::Auto,
+        None,
+        None,
+        false,
+        false,
+        ActivateWindow::Yes,
+    );
+    layout.verify_invariants();
+    assert!(layout.active_workspace().unwrap().has_window(&3));
+    assert_eq!(layout.focus().map(|window| *window.id()), Some(3));
+    assert_eq!(
+        layout
+            .window_under(&output, pinned_pos)
+            .map(|(window, _)| *window.id()),
+        Some(2)
+    );
+
+    layout.switch_workspace_up();
+    layout.verify_invariants();
+    assert_eq!(
+        layout
+            .window_under(&output, pinned_pos)
+            .map(|(window, _)| *window.id()),
+        Some(2)
+    );
+
+    layout.toggle_window_pinned(Some(&2));
+    layout.verify_invariants();
+    assert!(!layout
+        .windows()
+        .find(|(_, window)| window.id() == &2)
+        .unwrap()
+        .1
+        .is_pinned());
+    assert!(layout.active_workspace().unwrap().has_window(&2));
+}
+
+#[test]
+fn unpinning_into_the_last_workspace_keeps_the_workspace_invariant() {
+    let mut layout = Layout::default();
+    Op::AddOutput(1).apply(&mut layout);
+    let output = layout.outputs().next().unwrap().clone();
+
+    layout.add_window(
+        TestWindow::new(TestWindowParams {
+            rules: Some(ResolvedWindowRules {
+                open_pinned: Some(true),
+                ..Default::default()
+            }),
+            ..TestWindowParams::new(4)
+        }),
+        AddWindowTarget::Auto,
+        None,
+        None,
+        false,
+        false,
+        ActivateWindow::Yes,
+    );
+    assert!(layout.focus().unwrap().is_pinned());
+
+    layout.toggle_window_pinned(None);
+    layout.verify_invariants();
+
+    let monitor = layout.monitor_for_output(&output).unwrap();
+    assert!(monitor.pinned.windows().next().is_none());
+    assert!(!monitor.workspaces.last().unwrap().has_windows());
+    assert!(layout.active_workspace().unwrap().has_window(&4));
+    assert!(!layout
+        .windows()
+        .find(|(_, window)| window.id() == &4)
+        .unwrap()
+        .1
+        .is_pinned());
+}
+
+#[test]
 fn removing_output_must_keep_empty_focus_on_primary() {
     let ops = [
         Op::AddOutput(1),

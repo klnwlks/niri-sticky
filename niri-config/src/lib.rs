@@ -672,6 +672,22 @@ mod tests {
     }
 
     #[test]
+    fn parse_pinned_window_rules() {
+        let parsed = do_parse(
+            r#"
+            window-rule {
+                match is-pinned=true
+                open-pinned true
+            }
+            "#,
+        );
+
+        let rule = &parsed.window_rules[0];
+        assert_eq!(rule.matches[0].is_pinned, Some(true));
+        assert_eq!(rule.open_pinned, Some(true));
+    }
+
+    #[test]
     fn parse() {
         let parsed = do_parse(
             r##"
@@ -1760,6 +1776,7 @@ mod tests {
                             is_focused: None,
                             is_active_in_column: None,
                             is_floating: None,
+                            is_pinned: None,
                             is_window_cast_target: None,
                             is_urgent: None,
                             at_startup: None,
@@ -1779,6 +1796,7 @@ mod tests {
                             is_focused: None,
                             is_active_in_column: None,
                             is_floating: None,
+                            is_pinned: None,
                             is_window_cast_target: None,
                             is_urgent: None,
                             at_startup: None,
@@ -1794,6 +1812,7 @@ mod tests {
                             ),
                             is_active_in_column: None,
                             is_floating: None,
+                            is_pinned: None,
                             is_window_cast_target: None,
                             is_urgent: None,
                             at_startup: None,
@@ -1823,6 +1842,7 @@ mod tests {
                     open_floating: Some(
                         false,
                     ),
+                    open_pinned: None,
                     open_focused: Some(
                         true,
                     ),
