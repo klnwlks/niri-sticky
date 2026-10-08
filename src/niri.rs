@@ -4524,6 +4524,7 @@ impl Niri {
                 .render_interactive_move_for_output(ctx.r(), output, &mut |elem| push(elem.into()));
 
             mon.render_insert_hint_between_workspaces(ctx.renderer, &mut |elem| push(elem.into()));
+            mon.render_pinned_windows(ctx.r(), focus_ring, &mut |elem| push(elem.into()));
 
             mon.render_workspaces(ctx.r(), focus_ring, &mut |elem| push(elem.into()));
 
@@ -4565,6 +4566,7 @@ impl Niri {
                 push_popups_from_layer!(Layer::Bottom, ns, xray_pos, process!(geo));
                 push_popups_from_layer!(Layer::Background, ns, xray_pos, process!(geo));
             }
+            mon.render_pinned_windows(ctx.r(), focus_ring, &mut |elem| push(elem.into()));
 
             mon.render_workspaces(ctx.r(), focus_ring, &mut |elem| push(elem.into()));
 

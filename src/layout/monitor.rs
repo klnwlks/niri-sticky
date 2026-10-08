@@ -1902,8 +1902,16 @@ impl<W: LayoutElement> Monitor<W> {
                 }
             }
         }
-        // Pinned windows use output coordinates and stay at full size during workspace switches
-        // and in the overview. Draw them last so they remain above every workspace.
+    }
+
+    /// Keep pinned windows in output coordinates, outside workspace zoom and movement.
+    pub fn render_pinned_windows<R: NiriRenderer>(
+        &self,
+        mut ctx: RenderCtx<R>,
+        focus_ring: bool,
+        push: &mut dyn FnMut(MonitorRenderElement<R>),
+    ) {
+        let scale = self.scale.fractional_scale();
         let crop_bounds = Rectangle::new(
             Point::from((-i32::MAX / 2, -i32::MAX / 2)),
             Size::from((i32::MAX, i32::MAX)),
